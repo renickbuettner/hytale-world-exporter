@@ -12,7 +12,7 @@ use rust_i18n::t;
 
 rust_i18n::i18n!("locales", fallback = "en");
 
-const TAB_CONTENT_MAX_HEIGHT: f32 = 220.0;
+const TAB_CONTENT_MAX_HEIGHT: f32 = 260.0;
 
 fn detect_system_locale() -> String {
     sys_locale::get_locale()
@@ -161,7 +161,7 @@ fn main() -> Result<(), eframe::Error> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([720.0, 720.0])
+            .with_inner_size([820.0, 660.0])
             .with_resizable(false),
         ..Default::default()
     };
@@ -497,9 +497,20 @@ impl eframe::App for HytaleBackupApp {
                                     .id_salt("logs_content")
                                     .max_height(TAB_CONTENT_MAX_HEIGHT)
                                     .show(ui, |ui| {
-                                        ui.add(egui::TextEdit::multiline(&mut log.content.as_str())
-                                            .font(egui::TextStyle::Monospace)
-                                            .desired_width(f32::INFINITY));
+                                        for line in log.content.lines() {
+                                            let text = if line.contains("ERROR") {
+                                                egui::RichText::new(line)
+                                                    .monospace()
+                                                    .color(egui::Color32::from_rgb(255, 100, 100))
+                                            } else if line.contains("WARN") {
+                                                egui::RichText::new(line)
+                                                    .monospace()
+                                                    .color(egui::Color32::from_rgb(255, 180, 100))
+                                            } else {
+                                                egui::RichText::new(line).monospace()
+                                            };
+                                            ui.label(text);
+                                        }
                                     });
                             } else {
                                 ui.label(t!("app.no_logs_found"));

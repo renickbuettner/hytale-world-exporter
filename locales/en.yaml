@@ -3,7 +3,7 @@ app:
   available_worlds: "Available Worlds:"
   refresh: "🔄 Refresh"
   no_worlds_found: "No worlds found."
-  compress_world: "Compress World"
+  compress_world: "Export World"
   compressing: "Compressing..."
   backup_success: "Backup created successfully:"
   error: "Error:"

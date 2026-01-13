@@ -3,7 +3,7 @@ app:
   available_worlds: "Verfügbare Welten:"
   refresh: "🔄 Aktualisieren"
   no_worlds_found: "Keine Welten gefunden."
-  compress_world: "Welt komprimieren"
+  compress_world: "Welt exportieren"
   compressing: "Komprimiere..."
   backup_success: "Backup erfolgreich erstellt:"
   error: "Fehler:"

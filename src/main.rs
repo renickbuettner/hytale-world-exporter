@@ -161,7 +161,7 @@ fn main() -> Result<(), eframe::Error> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([720.0, 620.0])
+            .with_inner_size([720.0, 720.0])
             .with_resizable(false),
         ..Default::default()
     };
@@ -403,10 +403,12 @@ impl eframe::App for HytaleBackupApp {
 
             if let Some(index) = self.selected_world {
                 if let Some(world) = self.worlds.get(index) {
+                    let available_width = ui.available_width();
                     egui::Frame::group(ui.style())
                         .inner_margin(10.0)
                         .rounding(5.0)
                         .show(ui, |ui| {
+                            ui.set_width(available_width - 20.0);
                             ui.label(egui::RichText::new(&world.name).strong().size(16.0));
                             ui.add_space(10.0);
 

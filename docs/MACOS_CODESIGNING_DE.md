@@ -1,5 +1,7 @@
 # macOS Code-Signierung - Anleitung
 
+⚠️ This is a quick research by Copilot and has not been verified for accuracy. Please review and adjust as necessary. ⚠️
+
 ## Problem
 
 macOS verhindert standardmäßig das Ausführen von Apps, die nicht von einem verifizierten Entwickler signiert sind. Dies führt zu Fehlermeldungen wie:

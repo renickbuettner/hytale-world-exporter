@@ -109,7 +109,7 @@ jobs:
         run: zip -r "Hytale-World-Exporter-macOS.zip" "Hytale World Exporter.app"
 
       - name: Notarize macOS App
-        if: ${{ secrets.APPLE_ID != '' && secrets.APPLE_TEAM_ID != '' && secrets.APPLE_APP_PASSWORD != '' }}
+        if: secrets.APPLE_ID && secrets.APPLE_TEAM_ID && secrets.APPLE_APP_PASSWORD
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -118,11 +118,15 @@ jobs:
           echo "Notarizing app with Apple..."
           
           # Submit for notarization using xcrun notarytool
-          xcrun notarytool submit "Hytale-World-Exporter-macOS.zip" \
+          if ! xcrun notarytool submit "Hytale-World-Exporter-macOS.zip" \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_PASSWORD" \
-            --wait
+            --wait \
+            --no-progress; then
+            echo "Error: Notarization submission failed"
+            exit 1
+          fi
           
           # Unzip the archive to staple the ticket
           if ! unzip -q "Hytale-World-Exporter-macOS.zip"; then
@@ -131,7 +135,10 @@ jobs:
           fi
           
           # Staple the notarization ticket to the app using xcrun stapler
-          xcrun stapler staple "Hytale World Exporter.app"
+          if ! xcrun stapler staple "Hytale World Exporter.app"; then
+            echo "Error: Failed to staple notarization ticket"
+            exit 1
+          fi
           
           # Re-create the ZIP archive with the stapled app
           rm "Hytale-World-Exporter-macOS.zip"

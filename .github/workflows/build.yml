@@ -108,6 +108,35 @@ jobs:
       - name: Create ZIP archive
         run: zip -r "Hytale-World-Exporter-macOS.zip" "Hytale World Exporter.app"
 
+      - name: Notarize macOS App
+        run: |
+          # Check if notarization credentials are available
+          if [ -n "${{ secrets.APPLE_ID }}" ] && [ -n "${{ secrets.APPLE_TEAM_ID }}" ] && [ -n "${{ secrets.APPLE_APP_PASSWORD }}" ]; then
+            echo "Notarizing app with Apple..."
+            
+            # Submit for notarization using xcrun notarytool
+            xcrun notarytool submit "Hytale-World-Exporter-macOS.zip" \
+              --apple-id "${{ secrets.APPLE_ID }}" \
+              --team-id "${{ secrets.APPLE_TEAM_ID }}" \
+              --password "${{ secrets.APPLE_APP_PASSWORD }}" \
+              --wait
+            
+            # Unzip the archive to staple the ticket
+            unzip -q "Hytale-World-Exporter-macOS.zip"
+            
+            # Staple the notarization ticket to the app using xcrun stapler
+            xcrun stapler staple "Hytale World Exporter.app"
+            
+            # Re-create the ZIP archive with the stapled app
+            rm "Hytale-World-Exporter-macOS.zip"
+            zip -r "Hytale-World-Exporter-macOS.zip" "Hytale World Exporter.app"
+            
+            echo "Notarization completed successfully"
+          else
+            echo "Notarization credentials not found. Skipping notarization..."
+            echo "To enable notarization, add APPLE_ID, APPLE_TEAM_ID, and APPLE_APP_PASSWORD secrets."
+          fi
+
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:

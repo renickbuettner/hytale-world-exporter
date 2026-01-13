@@ -94,6 +94,8 @@ For distributing the app without security warnings, you need an Apple Developer 
    
    Go to your repository Settings > Secrets and variables > Actions, and add:
    
+   **For Code Signing (required):**
+   
    - `MACOS_CERTIFICATE`: Base64-encoded certificate file
      ```bash
      base64 -i certificate.p12 | pbcopy
@@ -109,23 +111,67 @@ For distributing the app without security warnings, you need an Apple Developer 
      security find-identity -v -p codesigning
      ```
 
+   **For Notarization (optional, recommended):**
+   
+   - `APPLE_ID`: Your Apple ID email address
+   
+   - `APPLE_TEAM_ID`: Your Team ID from developer.apple.com
+   
+   - `APPLE_APP_PASSWORD`: App-specific password
+     - Create this at [appleid.apple.com](https://appleid.apple.com)
+     - Go to **Security** > **App-Specific Passwords**
+     - Generate a new password for "GitHub Actions"
+
 3. **The build workflow will automatically**:
    - Use certificate-based signing if secrets are configured
    - Fall back to ad-hoc signing if no certificate is available
+   - **Notarize the app** if Apple credentials are configured (APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD)
+   - Skip notarization if credentials are not available
    - Ad-hoc signed apps work but require users to manually allow them in System Preferences
 
-#### Optional: Notarization
+#### Notarization
 
-For full distribution without warnings, you also need to notarize the app with Apple:
+Notarization is integrated into the build workflow and will be performed automatically when the required secrets are configured.
+
+**Automatic Notarization (CI/CD)**
+
+The GitHub Actions workflow automatically performs these steps:
+
+1. **Sign** the app with your Developer ID Certificate
+2. **Create** a ZIP archive
+3. **Notarize** using `xcrun notarytool`:
+   - Submit the ZIP archive to Apple
+   - Wait for approval (typically 1-5 minutes)
+4. **Staple** using `xcrun stapler`:
+   - Attach the notarization ticket to the app
+   - Re-package the ZIP with the notarized app
+
+If notarization secrets (`APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD`) are not configured, this step will be skipped and only code signing will be performed.
+
+**Manual Notarization (Local Builds)**
+
+For local builds, you can manually notarize the app:
 
 1. Create an App-Specific Password at [appleid.apple.com](https://appleid.apple.com)
-2. Add these secrets to GitHub:
-   - `APPLE_ID`: Your Apple ID email
-   - `APPLE_TEAM_ID`: Your Team ID from developer.apple.com
-   - `APPLE_APP_PASSWORD`: App-specific password
-3. Add notarization step to the workflow after signing
+2. Create ZIP archive:
+   ```bash
+   zip -r "Hytale-World-Exporter-macOS.zip" "Hytale World Exporter.app"
+   ```
+3. Submit for notarization using `xcrun notarytool`:
+   ```bash
+   xcrun notarytool submit "Hytale-World-Exporter-macOS.zip" \
+     --apple-id "your@email.com" \
+     --team-id "TEAM_ID" \
+     --password "app-specific-password" \
+     --wait
+   ```
+4. Staple the notarization ticket using `xcrun stapler`:
+   ```bash
+   unzip "Hytale-World-Exporter-macOS.zip"
+   xcrun stapler staple "Hytale World Exporter.app"
+   ```
 
-For more information, see [Apple's Code Signing Guide](https://developer.apple.com/support/code-signing/).
+For more information, see [Apple's Code Signing Guide](https://developer.apple.com/support/code-signing/) and [Notarizing macOS Software](https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution).
 
 ## License
 

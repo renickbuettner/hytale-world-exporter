@@ -88,6 +88,15 @@ fn get_world_backups(world_path: &PathBuf) -> Vec<BackupInfo> {
             entries
                 .filter_map(|entry| entry.ok())
                 .filter(|entry| entry.path().is_file())
+                .filter(|entry| {
+                    // Filter out system files
+                    let name = entry.file_name();
+                    let name_str = name.to_string_lossy();
+                    !name_str.starts_with(".DS_Store") &&
+                    !name_str.starts_with("Thumbs.db") &&
+                    !name_str.starts_with("desktop.ini") &&
+                    !name_str.starts_with("._")
+                })
                 .filter_map(|entry| {
                     let name = entry.file_name().to_str()?.to_string();
                     let path = entry.path();

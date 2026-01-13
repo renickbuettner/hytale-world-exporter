@@ -83,3 +83,14 @@ codesign --force --deep --sign - "Hytale World Exporter.app"
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
+
+## Screenshots
+
+<p align="center">
+  <img src="assets/screenshots/macos_01_backups.png" alt="Backups Tab" width="600">
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/macos_02_logs.png" alt="Logs Tab" width="600">
+</p>
+

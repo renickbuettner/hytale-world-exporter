@@ -1,0 +1,24 @@
+app:
+  title: "Hytale Welten Backup"
+  available_worlds: "Verfügbare Welten:"
+  refresh: "🔄 Aktualisieren"
+  no_worlds_found: "Keine Welten gefunden."
+  compress_world: "🗜️ Welt komprimieren"
+  backup_success: "✓ Backup erfolgreich erstellt:"
+  error: "✗ Fehler:"
+
+errors:
+  appdata_not_found: "APPDATA Umgebungsvariable nicht gefunden"
+  home_not_found: "Home-Verzeichnis nicht gefunden"
+  platform_not_supported: "Plattform wird nicht unterstützt"
+  downloads_not_found: "Downloads-Ordner nicht gefunden"
+  world_not_found: "Welt '%{name}' nicht gefunden"
+  zip_create_failed: "Konnte ZIP-Datei nicht erstellen: %{error}"
+  read_files_failed: "Fehler beim Lesen der Dateien: %{error}"
+  process_path_failed: "Fehler beim Verarbeiten des Pfades: %{error}"
+  add_file_failed: "Konnte Datei nicht zum ZIP hinzufügen: %{error}"
+  read_file_failed: "Konnte Datei nicht lesen: %{error}"
+  write_zip_failed: "Konnte Daten nicht in ZIP schreiben: %{error}"
+  add_dir_failed: "Konnte Verzeichnis nicht zum ZIP hinzufügen: %{error}"
+  finish_zip_failed: "Konnte ZIP-Datei nicht fertigstellen: %{error}"
+

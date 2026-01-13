@@ -6,7 +6,24 @@ use walkdir::WalkDir;
 use zip::write::FileOptions;
 use zip::ZipWriter;
 
+use rust_i18n::t;
+
+rust_i18n::i18n!("locales", fallback = "en");
+
+fn detect_system_locale() -> String {
+    sys_locale::get_locale()
+        .map(|locale| {
+            // Extract language code (e.g., "de-DE" -> "de", "en-US" -> "en")
+            locale.split('-').next().unwrap_or("en").to_string()
+        })
+        .unwrap_or_else(|| "en".to_string())
+}
+
 fn main() -> Result<(), eframe::Error> {
+    // Set locale based on system language
+    let locale = detect_system_locale();
+    rust_i18n::set_locale(&locale);
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([600.0, 680.0])
@@ -15,7 +32,7 @@ fn main() -> Result<(), eframe::Error> {
     };
 
     eframe::run_native(
-        "Hytale Backup",
+        &t!("app.title"),
         options,
         Box::new(|_cc| Ok(Box::new(HytaleBackupApp::new()))),
     )
@@ -72,14 +89,14 @@ impl eframe::App for HytaleBackupApp {
             ui.add_space(20.0);
             
             ui.vertical_centered(|ui| {
-                ui.heading("Hytale Welten Backup");
+                ui.heading(t!("app.title"));
             });
             
             ui.add_space(20.0);
 
             ui.horizontal(|ui| {
-                ui.label("Verfügbare Welten:");
-                if ui.button("🔄 Aktualisieren").clicked() {
+                ui.label(t!("app.available_worlds"));
+                if ui.button(t!("app.refresh")).clicked() {
                     self.refresh_worlds();
                 }
             });
@@ -87,7 +104,7 @@ impl eframe::App for HytaleBackupApp {
             ui.add_space(10.0);
 
             if self.worlds.is_empty() {
-                ui.label("Keine Welten gefunden.");
+                ui.label(t!("app.no_worlds_found"));
             } else {
                 egui::ScrollArea::vertical()
                     .max_height(400.0)
@@ -105,13 +122,32 @@ impl eframe::App for HytaleBackupApp {
             
             ui.vertical_centered(|ui| {
                 let button_enabled = self.selected_world.is_some();
-                if ui.add_enabled(button_enabled, egui::Button::new("🗜️ Welt komprimieren")).clicked() {
+                if ui.add_enabled(button_enabled, egui::Button::new(t!("app.compress_world"))).clicked() {
                     if let Some(index) = self.selected_world {
-                        let world_name = &self.worlds[index];
-                        self.status_message = match backup_world(world_name) {
-                            Ok(path) => format!("✓ Backup erfolgreich erstellt:\n{}", path),
-                            Err(e) => format!("✗ Fehler: {}", e),
+                        let world_name = self.worlds[index].clone();
+
+                        // Create default filename with timestamp
+                        let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
+                        let default_filename = format!("{}_{}.zip", world_name, timestamp);
+
+                        // Show save file dialog
+                        let file_dialog = rfd::FileDialog::new()
+                            .set_file_name(&default_filename)
+                            .add_filter("ZIP", &["zip"]);
+
+                        // Set default directory to Downloads if available
+                        let file_dialog = if let Some(downloads) = dirs::download_dir() {
+                            file_dialog.set_directory(&downloads)
+                        } else {
+                            file_dialog
                         };
+
+                        if let Some(save_path) = file_dialog.save_file() {
+                            self.status_message = match backup_world_to_path(&world_name, &save_path) {
+                                Ok(path) => format!("{}\n{}", t!("app.backup_success"), path),
+                                Err(e) => format!("{} {}", t!("app.error"), e),
+                            };
+                        }
                     }
                 }
             });
@@ -133,7 +169,7 @@ fn get_hytale_worlds_path() -> Result<PathBuf, String> {
         if let Some(appdata) = std::env::var_os("APPDATA") {
             return Ok(PathBuf::from(appdata).join("Hytale").join("worlds"));
         }
-        Err("APPDATA Umgebungsvariable nicht gefunden".to_string())
+        Err(t!("errors.appdata_not_found").to_string())
     }
     
     #[cfg(target_os = "macos")]
@@ -146,40 +182,29 @@ fn get_hytale_worlds_path() -> Result<PathBuf, String> {
                 .join("UserData")
                 .join("Saves"));
         }
-        Err("Home-Verzeichnis nicht gefunden".to_string())
+        Err(t!("errors.home_not_found").to_string())
     }
     
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
-        Err("Plattform wird nicht unterstützt".to_string())
+        Err(t!("errors.platform_not_supported").to_string())
     }
 }
 
-fn get_downloads_path() -> Result<PathBuf, String> {
-    dirs::download_dir().ok_or_else(|| "Downloads-Ordner nicht gefunden".to_string())
-}
 
 
-fn backup_world(world_name: &str) -> Result<String, String> {
+fn backup_world_to_path(world_name: &str, zip_path: &PathBuf) -> Result<String, String> {
     // Get the worlds directory
     let worlds_path = get_hytale_worlds_path()?;
     let world_path = worlds_path.join(world_name);
 
     if !world_path.exists() {
-        return Err(format!("Welt '{}' nicht gefunden", world_name));
+        return Err(t!("errors.world_not_found", name = world_name).to_string());
     }
 
-    // Get the downloads directory
-    let downloads_path = get_downloads_path()?;
-
-    // Create timestamp for filename
-    let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
-    let zip_filename = format!("{}_{}.zip", world_name, timestamp);
-    let zip_path = downloads_path.join(&zip_filename);
-
     // Create the ZIP file
-    let file = File::create(&zip_path)
-        .map_err(|e| format!("Konnte ZIP-Datei nicht erstellen: {}", e))?;
+    let file = File::create(zip_path)
+        .map_err(|e| t!("errors.zip_create_failed", error = e.to_string()).to_string())?;
 
     let mut zip = ZipWriter::new(file);
     let options = FileOptions::<()>::default()
@@ -187,11 +212,11 @@ fn backup_world(world_name: &str) -> Result<String, String> {
 
     // Walk through all files in the world directory
     for entry in WalkDir::new(&world_path) {
-        let entry = entry.map_err(|e| format!("Fehler beim Lesen der Dateien: {}", e))?;
+        let entry = entry.map_err(|e| t!("errors.read_files_failed", error = e.to_string()).to_string())?;
         let path = entry.path();
         let name = path
             .strip_prefix(&world_path)
-            .map_err(|e| format!("Fehler beim Verarbeiten des Pfades: {}", e))?;
+            .map_err(|e| t!("errors.process_path_failed", error = e.to_string()).to_string())?;
 
         // Skip empty directory names
         if name.as_os_str().is_empty() {
@@ -201,22 +226,22 @@ fn backup_world(world_name: &str) -> Result<String, String> {
         if path.is_file() {
             // Add file to ZIP
             zip.start_file(name.to_string_lossy().to_string(), options)
-                .map_err(|e| format!("Konnte Datei nicht zum ZIP hinzufügen: {}", e))?;
+                .map_err(|e| t!("errors.add_file_failed", error = e.to_string()).to_string())?;
 
             let file_content = fs::read(path)
-                .map_err(|e| format!("Konnte Datei nicht lesen: {}", e))?;
+                .map_err(|e| t!("errors.read_file_failed", error = e.to_string()).to_string())?;
 
             zip.write_all(&file_content)
-                .map_err(|e| format!("Konnte Daten nicht in ZIP schreiben: {}", e))?;
+                .map_err(|e| t!("errors.write_zip_failed", error = e.to_string()).to_string())?;
         } else if path.is_dir() {
             // Add directory to ZIP
             zip.add_directory(name.to_string_lossy().to_string(), options)
-                .map_err(|e| format!("Konnte Verzeichnis nicht zum ZIP hinzufügen: {}", e))?;
+                .map_err(|e| t!("errors.add_dir_failed", error = e.to_string()).to_string())?;
         }
     }
 
     zip.finish()
-        .map_err(|e| format!("Konnte ZIP-Datei nicht fertigstellen: {}", e))?;
+        .map_err(|e| t!("errors.finish_zip_failed", error = e.to_string()).to_string())?;
 
     Ok(zip_path.to_string_lossy().to_string())
 }

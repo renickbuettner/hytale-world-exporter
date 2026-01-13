@@ -49,12 +49,37 @@ fn get_directory_size(path: &PathBuf) -> u64 {
         .sum()
 }
 
-fn count_files(path: &PathBuf) -> usize {
-    WalkDir::new(path)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_file())
-        .count()
+
+fn get_last_played(world_path: &PathBuf) -> Option<String> {
+    let logs_path = world_path.join("logs");
+    if !logs_path.exists() {
+        return None;
+    }
+
+    let mut logs: Vec<_> = fs::read_dir(&logs_path)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            entry.path().is_file() &&
+            entry.path().extension().map_or(false, |ext| ext == "log")
+        })
+        .collect();
+
+    // Sort by filename descending (newest first based on timestamp in filename)
+    logs.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
+
+    logs.first().and_then(|entry| {
+        let name = entry.file_name().to_str()?.to_string();
+        // Parse timestamp from filename like "2026-01-13_19-35-06_server.log"
+        if name.len() >= 19 {
+            let date_part = &name[0..10]; // "2026-01-13"
+            let time_part = &name[11..19]; // "19-35-06"
+            let time_formatted = time_part.replace('-', ":");
+            Some(format!("{} {}", date_part, time_formatted))
+        } else {
+            None
+        }
+    })
 }
 
 #[derive(Clone)]
@@ -62,7 +87,7 @@ struct WorldInfo {
     name: String,
     path: PathBuf,
     size: u64,
-    file_count: usize,
+    last_played: Option<String>,
 }
 
 #[derive(Clone)]
@@ -231,12 +256,12 @@ impl HytaleBackupApp {
                                     let name = entry.file_name().to_str()?.to_string();
                                     let path = entry.path();
                                     let size = get_directory_size(&path);
-                                    let file_count = count_files(&path);
+                                    let last_played = get_last_played(&path);
                                     Some(WorldInfo {
                                         name,
                                         path,
                                         size,
-                                        file_count,
+                                        last_played,
                                     })
                                 })
                                 .collect()
@@ -442,8 +467,8 @@ impl eframe::App for HytaleBackupApp {
                                     ui.label(format_size(world.size));
                                     ui.end_row();
 
-                                    ui.label(t!("app.detail_files"));
-                                    ui.label(format!("{}", world.file_count));
+                                    ui.label(t!("app.detail_last_played"));
+                                    ui.label(world.last_played.clone().unwrap_or_else(|| t!("app.unknown").to_string()));
                                     ui.end_row();
 
                                     ui.label(t!("app.detail_path"));

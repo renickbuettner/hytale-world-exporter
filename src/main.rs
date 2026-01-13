@@ -379,6 +379,7 @@ impl eframe::App for HytaleBackupApp {
                         ui.label(t!("app.no_worlds_found"));
                     } else {
                         egui::ScrollArea::vertical()
+                            .id_salt("worlds_list")
                             .max_height(350.0)
                             .show(ui, |ui| {
                                 for (index, world) in self.worlds.iter().enumerate() {
@@ -458,6 +459,7 @@ impl eframe::App for HytaleBackupApp {
                                         ui.label(t!("app.no_backups_found"));
                                     } else {
                                         egui::ScrollArea::vertical()
+                                            .id_salt("backups_list")
                                             .max_height(200.0)
                                             .show(ui, |ui| {
                                                 for backup in &backups {
@@ -494,6 +496,7 @@ impl eframe::App for HytaleBackupApp {
                                         ui.add_space(5.0);
 
                                         egui::ScrollArea::vertical()
+                                            .id_salt("logs_content")
                                             .max_height(200.0)
                                             .show(ui, |ui| {
                                                 ui.add(egui::TextEdit::multiline(&mut log.content.as_str())

@@ -1,12 +1,12 @@
 use eframe::egui;
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use walkdir::WalkDir;
 use zip::write::FileOptions;
-use zip::ZipWriter;
+use zip::{ZipArchive, ZipWriter};
 
 use rust_i18n::t;
 
@@ -228,6 +228,7 @@ struct HytaleBackupApp {
     include_backups: bool,
     progress: Arc<Mutex<BackupProgress>>,
     pending_delete_backup: Option<PathBuf>,
+    pending_import: Option<(PathBuf, String)>, // (zip_path, world_name)
 }
 
 impl HytaleBackupApp {
@@ -242,6 +243,7 @@ impl HytaleBackupApp {
             include_backups: true,
             progress: Arc::new(Mutex::new(BackupProgress::default())),
             pending_delete_backup: None,
+            pending_import: None,
         }
     }
 
@@ -309,6 +311,41 @@ impl eframe::App for HytaleBackupApp {
                                 self.status_message = t!("app.backup_deleted").to_string();
                             }
                             self.pending_delete_backup = None;
+                        }
+                    });
+                });
+        }
+
+        // Import confirmation dialog
+        if let Some((zip_path, world_name)) = self.pending_import.clone() {
+            egui::Window::new(t!("app.confirm_import_title"))
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(ctx, |ui| {
+                    ui.label(t!("app.confirm_import_message"));
+                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new(&world_name).strong().size(16.0));
+                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new(t!("app.confirm_import_warning")).color(egui::Color32::from_rgb(255, 180, 100)));
+                    ui.add_space(15.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button(t!("app.cancel")).clicked() {
+                            self.pending_import = None;
+                        }
+
+                        if ui.button(egui::RichText::new(t!("app.import")).color(egui::Color32::from_rgb(100, 200, 100))).clicked() {
+                            match import_world(&zip_path, &world_name) {
+                                Ok(_) => {
+                                    self.status_message = t!("app.import_success").to_string();
+                                    self.refresh_worlds();
+                                }
+                                Err(e) => {
+                                    self.status_message = format!("{} {}", t!("app.error"), e);
+                                }
+                            }
+                            self.pending_import = None;
                         }
                     });
                 });
@@ -449,6 +486,31 @@ impl eframe::App for HytaleBackupApp {
                 ui.label(t!("app.available_worlds"));
                 if ui.button(t!("app.refresh")).clicked() {
                     self.refresh_worlds();
+                }
+                if ui.button(t!("app.import_world")).clicked() {
+                    // Show file dialog to select a ZIP file
+                    let file_dialog = rfd::FileDialog::new()
+                        .add_filter("ZIP", &["zip"]);
+
+                    if let Some(zip_path) = file_dialog.pick_file() {
+                        // Check if it's a ZIP file
+                        if zip_path.extension().map_or(false, |ext| ext == "zip") {
+                            // Extract world name from filename (remove date suffix)
+                            // Format: WorldName_2026-01-13_19-35-06.zip -> WorldName
+                            if let Some(filename) = zip_path.file_stem() {
+                                let filename_str = filename.to_string_lossy().to_string();
+                                // Remove timestamp suffix (last 20 characters: _YYYY-MM-DD_HH-MM-SS)
+                                let world_name = if filename_str.len() > 20 && filename_str.chars().rev().nth(19) == Some('_') {
+                                    filename_str[..filename_str.len() - 20].to_string()
+                                } else {
+                                    filename_str
+                                };
+                                self.pending_import = Some((zip_path, world_name));
+                            }
+                        } else {
+                            self.status_message = t!("app.error_not_zip").to_string();
+                        }
+                    }
                 }
             });
 
@@ -744,3 +806,65 @@ fn backup_world_to_path_with_progress(
 
     Ok(zip_path.to_string_lossy().to_string())
 }
+
+fn import_world(zip_path: &PathBuf, world_name: &str) -> Result<(), String> {
+    // Get the saves directory
+    let saves_path = get_hytale_worlds_path()?;
+    let world_path = saves_path.join(world_name);
+
+    // If the world folder exists, delete it first
+    if world_path.exists() {
+        fs::remove_dir_all(&world_path)
+            .map_err(|e| t!("errors.delete_world_failed", error = e.to_string()).to_string())?;
+    }
+
+    // Create the world directory
+    fs::create_dir_all(&world_path)
+        .map_err(|e| t!("errors.create_dir_failed", error = e.to_string()).to_string())?;
+
+    // Open the ZIP file
+    let file = File::open(zip_path)
+        .map_err(|e| t!("errors.open_zip_failed", error = e.to_string()).to_string())?;
+
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| t!("errors.read_zip_failed", error = e.to_string()).to_string())?;
+
+    // Extract all files
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)
+            .map_err(|e| t!("errors.read_zip_entry_failed", error = e.to_string()).to_string())?;
+
+        let outpath = match file.enclosed_name() {
+            Some(path) => world_path.join(path),
+            None => continue,
+        };
+
+        if file.name().ends_with('/') {
+            // Create directory
+            fs::create_dir_all(&outpath)
+                .map_err(|e| t!("errors.create_dir_failed", error = e.to_string()).to_string())?;
+        } else {
+            // Create parent directories if needed
+            if let Some(parent) = outpath.parent() {
+                if !parent.exists() {
+                    fs::create_dir_all(parent)
+                        .map_err(|e| t!("errors.create_dir_failed", error = e.to_string()).to_string())?;
+                }
+            }
+
+            // Extract file
+            let mut outfile = File::create(&outpath)
+                .map_err(|e| t!("errors.create_file_failed", error = e.to_string()).to_string())?;
+
+            let mut buffer = Vec::new();
+            file.read_to_end(&mut buffer)
+                .map_err(|e| t!("errors.read_zip_entry_failed", error = e.to_string()).to_string())?;
+
+            outfile.write_all(&buffer)
+                .map_err(|e| t!("errors.write_file_failed", error = e.to_string()).to_string())?;
+        }
+    }
+
+    Ok(())
+}
+

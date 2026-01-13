@@ -26,6 +26,13 @@ app:
   backup_deleted: "Backup wurde gelöscht."
   include_logs: "Logs einschließen"
   include_backups: "Backups einschließen"
+  import_world: "📥 Welt importieren"
+  confirm_import_title: "Welt importieren?"
+  confirm_import_message: "Die folgende Welt wird importiert:"
+  confirm_import_warning: "⚠️ Falls diese Welt bereits existiert, wird sie unwiderruflich überschrieben!"
+  import: "Importieren"
+  import_success: "Welt wurde erfolgreich importiert."
+  error_not_zip: "Die ausgewählte Datei ist keine ZIP-Datei."
 
 errors:
   appdata_not_found: "APPDATA Umgebungsvariable nicht gefunden"
@@ -41,4 +48,11 @@ errors:
   write_zip_failed: "Konnte Daten nicht in ZIP schreiben: %{error}"
   add_dir_failed: "Konnte Verzeichnis nicht zum ZIP hinzufügen: %{error}"
   finish_zip_failed: "Konnte ZIP-Datei nicht fertigstellen: %{error}"
+  delete_world_failed: "Konnte Welt nicht löschen: %{error}"
+  create_dir_failed: "Konnte Verzeichnis nicht erstellen: %{error}"
+  open_zip_failed: "Konnte ZIP-Datei nicht öffnen: %{error}"
+  read_zip_failed: "Konnte ZIP-Datei nicht lesen: %{error}"
+  read_zip_entry_failed: "Konnte ZIP-Eintrag nicht lesen: %{error}"
+  create_file_failed: "Konnte Datei nicht erstellen: %{error}"
+  write_file_failed: "Konnte Datei nicht schreiben: %{error}"
 

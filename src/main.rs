@@ -21,6 +21,48 @@ fn detect_system_locale() -> String {
         .unwrap_or_else(|| "en".to_string())
 }
 
+fn format_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.2} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+fn get_directory_size(path: &PathBuf) -> u64 {
+    WalkDir::new(path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .filter_map(|e| e.metadata().ok())
+        .map(|m| m.len())
+        .sum()
+}
+
+fn count_files(path: &PathBuf) -> usize {
+    WalkDir::new(path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .count()
+}
+
+#[derive(Clone)]
+struct WorldInfo {
+    name: String,
+    path: PathBuf,
+    size: u64,
+    file_count: usize,
+}
+
 fn main() -> Result<(), eframe::Error> {
     // Set locale based on system language
     let locale = detect_system_locale();
@@ -63,7 +105,7 @@ impl Default for BackupProgress {
 
 struct HytaleBackupApp {
     status_message: String,
-    worlds: Vec<String>,
+    worlds: Vec<WorldInfo>,
     selected_world: Option<usize>,
     progress: Arc<Mutex<BackupProgress>>,
 }
@@ -79,17 +121,26 @@ impl HytaleBackupApp {
         }
     }
 
-    fn load_worlds() -> Vec<String> {
+    fn load_worlds() -> Vec<WorldInfo> {
         match get_hytale_worlds_path() {
-            Ok(path) => {
-                if path.exists() {
-                    fs::read_dir(&path)
+            Ok(base_path) => {
+                if base_path.exists() {
+                    fs::read_dir(&base_path)
                         .map(|entries| {
                             entries
                                 .filter_map(|entry| entry.ok())
                                 .filter(|entry| entry.path().is_dir())
                                 .filter_map(|entry| {
-                                    entry.file_name().to_str().map(|s| s.to_string())
+                                    let name = entry.file_name().to_str()?.to_string();
+                                    let path = entry.path();
+                                    let size = get_directory_size(&path);
+                                    let file_count = count_files(&path);
+                                    Some(WorldInfo {
+                                        name,
+                                        path,
+                                        size,
+                                        file_count,
+                                    })
                                 })
                                 .collect()
                         })
@@ -119,29 +170,86 @@ impl eframe::App for HytaleBackupApp {
             
             ui.add_space(20.0);
 
+            // 2/3 - 1/3 split layout
+            let available_width = ui.available_width();
+            let left_width = available_width * 0.65;
+            let right_width = available_width * 0.32;
+
             ui.horizontal(|ui| {
-                ui.label(t!("app.available_worlds"));
-                if ui.button(t!("app.refresh")).clicked() {
-                    self.refresh_worlds();
-                }
-            });
+                // Left panel (2/3) - World list
+                ui.vertical(|ui| {
+                    ui.set_width(left_width);
 
-            ui.add_space(10.0);
-
-            if self.worlds.is_empty() {
-                ui.label(t!("app.no_worlds_found"));
-            } else {
-                egui::ScrollArea::vertical()
-                    .max_height(400.0)
-                    .show(ui, |ui| {
-                        for (index, world_name) in self.worlds.iter().enumerate() {
-                            let is_selected = self.selected_world == Some(index);
-                            if ui.selectable_label(is_selected, format!("🌍 {}", world_name)).clicked() {
-                                self.selected_world = Some(index);
-                            }
+                    ui.horizontal(|ui| {
+                        ui.label(t!("app.available_worlds"));
+                        if ui.button(t!("app.refresh")).clicked() {
+                            self.refresh_worlds();
                         }
                     });
-            }
+
+                    ui.add_space(10.0);
+
+                    if self.worlds.is_empty() {
+                        ui.label(t!("app.no_worlds_found"));
+                    } else {
+                        egui::ScrollArea::vertical()
+                            .max_height(350.0)
+                            .show(ui, |ui| {
+                                for (index, world) in self.worlds.iter().enumerate() {
+                                    let is_selected = self.selected_world == Some(index);
+                                    if ui.selectable_label(is_selected, format!("🌍 {}", world.name)).clicked() {
+                                        self.selected_world = Some(index);
+                                    }
+                                }
+                            });
+                    }
+                });
+
+                ui.add_space(10.0);
+
+                // Right panel (1/3) - World details
+                ui.vertical(|ui| {
+                    ui.set_width(right_width);
+
+                    ui.label(t!("app.details"));
+                    ui.add_space(10.0);
+
+                    if let Some(index) = self.selected_world {
+                        if let Some(world) = self.worlds.get(index) {
+                            egui::Frame::group(ui.style())
+                                .fill(ui.style().visuals.extreme_bg_color)
+                                .inner_margin(10.0)
+                                .rounding(5.0)
+                                .show(ui, |ui| {
+                                    ui.label(egui::RichText::new(&world.name).strong().size(16.0));
+                                    ui.add_space(10.0);
+
+                                    egui::Grid::new("world_details")
+                                        .num_columns(2)
+                                        .spacing([10.0, 5.0])
+                                        .show(ui, |ui| {
+                                            ui.label(t!("app.detail_size"));
+                                            ui.label(format_size(world.size));
+                                            ui.end_row();
+
+                                            ui.label(t!("app.detail_files"));
+                                            ui.label(format!("{}", world.file_count));
+                                            ui.end_row();
+
+                                            ui.label(t!("app.detail_path"));
+                                            ui.end_row();
+                                        });
+
+                                    // Path on separate line (can be long)
+                                    ui.add_space(5.0);
+                                    ui.label(egui::RichText::new(world.path.to_string_lossy().to_string()).small().weak());
+                                });
+                        }
+                    } else {
+                        ui.label(t!("app.select_world_hint"));
+                    }
+                });
+            });
 
             ui.add_space(20.0);
             
@@ -187,11 +295,11 @@ impl eframe::App for HytaleBackupApp {
                     let button_enabled = self.selected_world.is_some();
                     if ui.add_enabled(button_enabled, egui::Button::new(t!("app.compress_world"))).clicked() {
                         if let Some(index) = self.selected_world {
-                            let world_name = self.worlds[index].clone();
+                            let world = self.worlds[index].clone();
 
                             // Create default filename with timestamp
                             let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
-                            let default_filename = format!("{}_{}.zip", world_name, timestamp);
+                            let default_filename = format!("{}_{}.zip", world.name, timestamp);
 
                             // Show save file dialog
                             let file_dialog = rfd::FileDialog::new()
@@ -221,7 +329,7 @@ impl eframe::App for HytaleBackupApp {
                                 }
 
                                 thread::spawn(move || {
-                                    let result = backup_world_to_path_with_progress(&world_name, &save_path, &progress, &ctx);
+                                    let result = backup_world_to_path_with_progress(&world.name, &save_path, &progress, &ctx);
 
                                     let mut p = progress.lock().unwrap();
                                     p.is_running = false;

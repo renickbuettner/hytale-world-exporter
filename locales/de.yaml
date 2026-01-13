@@ -7,6 +7,11 @@ app:
   compressing: "Komprimiere..."
   backup_success: "✓ Backup erfolgreich erstellt:"
   error: "✗ Fehler:"
+  details: "Details"
+  detail_size: "Größe:"
+  detail_files: "Dateien:"
+  detail_path: "Pfad:"
+  select_world_hint: "Wähle eine Welt aus, um Details anzuzeigen."
 
 errors:
   appdata_not_found: "APPDATA Umgebungsvariable nicht gefunden"

@@ -325,72 +325,71 @@ impl eframe::App for HytaleBackupApp {
                     self.progress.lock().unwrap().result = None;
                 }
 
-                ui.vertical_centered(|ui| {
+                ui.horizontal(|ui| {
                     // Checkboxes for including logs and backups
-                    ui.horizontal(|ui| {
-                        ui.checkbox(&mut self.include_logs, t!("app.include_logs"));
-                        ui.add_space(20.0);
-                        ui.checkbox(&mut self.include_backups, t!("app.include_backups"));
-                    });
+                    ui.checkbox(&mut self.include_logs, t!("app.include_logs"));
+                    ui.add_space(20.0);
+                    ui.checkbox(&mut self.include_backups, t!("app.include_backups"));
 
-                    ui.add_space(10.0);
+                    // Button aligned to the right
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let button_enabled = self.selected_world.is_some();
+                        if ui.add_enabled(button_enabled, egui::Button::new(t!("app.compress_world"))).clicked() {
+                            if let Some(index) = self.selected_world {
+                                let world = self.worlds[index].clone();
+                                let include_logs = self.include_logs;
+                                let include_backups = self.include_backups;
 
-                    let button_enabled = self.selected_world.is_some();
-                    if ui.add_enabled(button_enabled, egui::Button::new(t!("app.compress_world"))).clicked() {
-                        if let Some(index) = self.selected_world {
-                            let world = self.worlds[index].clone();
-                            let include_logs = self.include_logs;
-                            let include_backups = self.include_backups;
+                                // Create default filename with timestamp
+                                let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
+                                let default_filename = format!("{}_{}.zip", world.name, timestamp);
 
-                            // Create default filename with timestamp
-                            let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
-                            let default_filename = format!("{}_{}.zip", world.name, timestamp);
+                                // Show save file dialog
+                                let file_dialog = rfd::FileDialog::new()
+                                    .set_file_name(&default_filename)
+                                    .add_filter("ZIP", &["zip"]);
 
-                            // Show save file dialog
-                            let file_dialog = rfd::FileDialog::new()
-                                .set_file_name(&default_filename)
-                                .add_filter("ZIP", &["zip"]);
+                                // Set default directory to Downloads if available
+                                let file_dialog = if let Some(downloads) = dirs::download_dir() {
+                                    file_dialog.set_directory(&downloads)
+                                } else {
+                                    file_dialog
+                                };
 
-                            // Set default directory to Downloads if available
-                            let file_dialog = if let Some(downloads) = dirs::download_dir() {
-                                file_dialog.set_directory(&downloads)
-                            } else {
-                                file_dialog
-                            };
+                                if let Some(save_path) = file_dialog.save_file() {
+                                    // Start backup in background thread
+                                    let progress = Arc::clone(&self.progress);
+                                    let ctx = ctx.clone();
 
-                            if let Some(save_path) = file_dialog.save_file() {
-                                // Start backup in background thread
-                                let progress = Arc::clone(&self.progress);
-                                let ctx = ctx.clone();
+                                    // Reset progress
+                                    {
+                                        let mut p = progress.lock().unwrap();
+                                        p.is_running = true;
+                                        p.current = 0;
+                                        p.total = 0;
+                                        p.current_file = String::new();
+                                        p.result = None;
+                                    }
 
-                                // Reset progress
-                                {
-                                    let mut p = progress.lock().unwrap();
-                                    p.is_running = true;
-                                    p.current = 0;
-                                    p.total = 0;
-                                    p.current_file = String::new();
-                                    p.result = None;
+                                    thread::spawn(move || {
+                                        let result = backup_world_to_path_with_progress(
+                                            &world.name,
+                                            &save_path,
+                                            include_logs,
+                                            include_backups,
+                                            &progress,
+                                            &ctx
+                                        );
+
+                                        let mut p = progress.lock().unwrap();
+                                        p.is_running = false;
+                                        p.result = Some(result);
+                                        ctx.request_repaint();
+                                    });
                                 }
-
-                                thread::spawn(move || {
-                                    let result = backup_world_to_path_with_progress(
-                                        &world.name,
-                                        &save_path,
-                                        include_logs,
-                                        include_backups,
-                                        &progress,
-                                        &ctx
-                                    );
-
-                                    let mut p = progress.lock().unwrap();
-                                    p.is_running = false;
-                                    p.result = Some(result);
-                                    ctx.request_repaint();
-                                });
                             }
                         }
-                    }
+                    });
                 });
             }
 

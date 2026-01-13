@@ -110,8 +110,7 @@ fn backup_worlds() -> Result<String, String> {
     
     let mut zip = ZipWriter::new(file);
     let options = FileOptions::<()>::default()
-        .compression_method(zip::CompressionMethod::Deflated)
-        .unix_permissions(0o755);
+        .compression_method(zip::CompressionMethod::Deflated);
     
     // Walk through all files in the worlds directory
     for entry in WalkDir::new(&worlds_path) {

@@ -199,6 +199,8 @@ struct HytaleBackupApp {
     worlds: Vec<WorldInfo>,
     selected_world: Option<usize>,
     selected_tab: usize,
+    include_logs: bool,
+    include_backups: bool,
     progress: Arc<Mutex<BackupProgress>>,
 }
 
@@ -210,6 +212,8 @@ impl HytaleBackupApp {
             worlds,
             selected_world: None,
             selected_tab: 0,
+            include_logs: true,
+            include_backups: true,
             progress: Arc::new(Mutex::new(BackupProgress::default())),
         }
     }
@@ -297,10 +301,21 @@ impl eframe::App for HytaleBackupApp {
                 }
 
                 ui.vertical_centered(|ui| {
+                    // Checkboxes for including logs and backups
+                    ui.horizontal(|ui| {
+                        ui.checkbox(&mut self.include_logs, t!("app.include_logs"));
+                        ui.add_space(20.0);
+                        ui.checkbox(&mut self.include_backups, t!("app.include_backups"));
+                    });
+
+                    ui.add_space(10.0);
+
                     let button_enabled = self.selected_world.is_some();
                     if ui.add_enabled(button_enabled, egui::Button::new(t!("app.compress_world"))).clicked() {
                         if let Some(index) = self.selected_world {
                             let world = self.worlds[index].clone();
+                            let include_logs = self.include_logs;
+                            let include_backups = self.include_backups;
 
                             // Create default filename with timestamp
                             let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
@@ -334,7 +349,14 @@ impl eframe::App for HytaleBackupApp {
                                 }
 
                                 thread::spawn(move || {
-                                    let result = backup_world_to_path_with_progress(&world.name, &save_path, &progress, &ctx);
+                                    let result = backup_world_to_path_with_progress(
+                                        &world.name,
+                                        &save_path,
+                                        include_logs,
+                                        include_backups,
+                                        &progress,
+                                        &ctx
+                                    );
 
                                     let mut p = progress.lock().unwrap();
                                     p.is_running = false;
@@ -559,6 +581,8 @@ fn get_hytale_worlds_path() -> Result<PathBuf, String> {
 fn backup_world_to_path_with_progress(
     world_name: &str,
     zip_path: &PathBuf,
+    include_logs: bool,
+    include_backups: bool,
     progress: &Arc<Mutex<BackupProgress>>,
     ctx: &egui::Context,
 ) -> Result<String, String> {
@@ -570,11 +594,24 @@ fn backup_world_to_path_with_progress(
         return Err(t!("errors.world_not_found", name = world_name).to_string());
     }
 
-    // Count total files first
+    // Helper function to check if path should be excluded
+    let should_exclude = |path: &std::path::Path| -> bool {
+        let path_str = path.to_string_lossy();
+        if !include_logs && path_str.contains("/logs/") {
+            return true;
+        }
+        if !include_backups && path_str.contains("/backup/") {
+            return true;
+        }
+        false
+    };
+
+    // Count total files first (excluding filtered directories)
     let total_files: usize = WalkDir::new(&world_path)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.path().is_file())
+        .filter(|e| !should_exclude(e.path()))
         .count();
 
     {
@@ -596,6 +633,12 @@ fn backup_world_to_path_with_progress(
     for entry in WalkDir::new(&world_path) {
         let entry = entry.map_err(|e| t!("errors.read_files_failed", error = e.to_string()).to_string())?;
         let path = entry.path();
+
+        // Skip excluded directories
+        if should_exclude(path) {
+            continue;
+        }
+
         let name = path
             .strip_prefix(&world_path)
             .map_err(|e| t!("errors.process_path_failed", error = e.to_string()).to_string())?;
@@ -626,6 +669,12 @@ fn backup_world_to_path_with_progress(
             zip.write_all(&file_content)
                 .map_err(|e| t!("errors.write_zip_failed", error = e.to_string()).to_string())?;
         } else if path.is_dir() {
+            // Skip excluded directories entirely
+            let name_str = name.to_string_lossy();
+            if (!include_logs && name_str == "logs") || (!include_backups && name_str == "backup") {
+                continue;
+            }
+
             // Add directory to ZIP
             zip.add_directory(name.to_string_lossy().to_string(), options)
                 .map_err(|e| t!("errors.add_dir_failed", error = e.to_string()).to_string())?;

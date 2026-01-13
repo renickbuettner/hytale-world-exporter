@@ -5,8 +5,8 @@ app:
   no_worlds_found: "Keine Welten gefunden."
   compress_world: "🗜️ Welt komprimieren"
   compressing: "Komprimiere..."
-  backup_success: "✓ Backup erfolgreich erstellt:"
-  error: "✗ Fehler:"
+  backup_success: "Backup erfolgreich erstellt:"
+  error: "Fehler:"
   details: "Details"
   detail_size: "Größe:"
   detail_files: "Dateien:"
@@ -17,6 +17,8 @@ app:
   no_backups_found: "Keine Backups gefunden."
   no_logs_found: "Keine Logs gefunden."
   open_in_finder: "Im Finder anzeigen"
+  include_logs: "Logs einschließen"
+  include_backups: "Backups einschließen"
 
 errors:
   appdata_not_found: "APPDATA Umgebungsvariable nicht gefunden"

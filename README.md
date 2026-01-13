@@ -1,5 +1,9 @@
 # Hytale World Exporter
 
+<p align="center">
+  <img src="assets/app_icon_256.png" alt="Hytale World Exporter Icon" width="128">
+</p>
+
 A cross-platform desktop application for backing up and restoring Hytale game worlds.
 
 ## Features

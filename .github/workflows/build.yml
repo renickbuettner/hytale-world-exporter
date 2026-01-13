@@ -1,0 +1,173 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+  APP_NAME: hytale-world-exporter
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build for macOS (Intel)
+        run: |
+          rustup target add x86_64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+
+      - name: Build for macOS (Apple Silicon)
+        run: |
+          rustup target add aarch64-apple-darwin
+          cargo build --release --target aarch64-apple-darwin
+
+      - name: Create Universal Binary
+        run: |
+          mkdir -p target/universal-apple-darwin/release
+          lipo -create \
+            target/x86_64-apple-darwin/release/${{ env.APP_NAME }} \
+            target/aarch64-apple-darwin/release/${{ env.APP_NAME }} \
+            -output target/universal-apple-darwin/release/${{ env.APP_NAME }}
+
+      - name: Create macOS App Bundle
+        run: |
+          mkdir -p "Hytale World Exporter.app/Contents/MacOS"
+          mkdir -p "Hytale World Exporter.app/Contents/Resources"
+          
+          cp target/universal-apple-darwin/release/${{ env.APP_NAME }} "Hytale World Exporter.app/Contents/MacOS/"
+          
+          cat > "Hytale World Exporter.app/Contents/Info.plist" << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>hytale-world-exporter</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.hytale.worldexporter</string>
+              <key>CFBundleName</key>
+              <string>Hytale World Exporter</string>
+              <key>CFBundleDisplayName</key>
+              <string>Hytale World Exporter</string>
+              <key>CFBundleVersion</key>
+              <string>1.0.0</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0.0</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>10.13</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+          
+          if [ -f "assets/app_icon.png" ]; then
+            cp assets/app_icon.png "Hytale World Exporter.app/Contents/Resources/"
+          fi
+
+      - name: Code Sign macOS App
+        run: |
+          # Check if signing certificate is available
+          if [ -n "${{ secrets.MACOS_CERTIFICATE }}" ]; then
+            echo "Code signing with certificate..."
+            
+            # Set up trap for cleanup
+            trap 'rm -f certificate.p12; security delete-keychain build.keychain 2>/dev/null || true' EXIT
+            
+            # Import certificate
+            echo "${{ secrets.MACOS_CERTIFICATE }}" | base64 --decode > certificate.p12
+            security create-keychain -p "${{ secrets.MACOS_KEYCHAIN_PASSWORD }}" build.keychain
+            security default-keychain -s build.keychain
+            security unlock-keychain -p "${{ secrets.MACOS_KEYCHAIN_PASSWORD }}" build.keychain
+            security import certificate.p12 -k build.keychain -P "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${{ secrets.MACOS_KEYCHAIN_PASSWORD }}" build.keychain
+            
+            # Sign the app
+            codesign --deep --force --verbose --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" --options runtime "Hytale World Exporter.app"
+          else
+            echo "No signing certificate found. Using ad-hoc signature..."
+            # Ad-hoc signature - allows the app to run on the building machine and be distributed for testing
+            # Users will need to allow it in System Preferences > Security & Privacy
+            codesign --deep --force --sign - "Hytale World Exporter.app"
+          fi
+          
+          # Verify signature
+          codesign --verify --verbose "Hytale World Exporter.app"
+          echo "Code signing completed successfully"
+
+      - name: Create ZIP archive
+        run: zip -r "Hytale-World-Exporter-macOS.zip" "Hytale World Exporter.app"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: Hytale-World-Exporter-macOS.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build for Windows
+        run: cargo build --release
+
+      - name: Create ZIP archive
+        run: Compress-Archive -Path "target/release/${{ env.APP_NAME }}.exe" -DestinationPath "Hytale-World-Exporter-Windows.zip"
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: Hytale-World-Exporter-Windows.zip
+
+  release:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-app
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-exe
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: build-${{ steps.sha.outputs.short }}
+          name: Build ${{ steps.sha.outputs.short }}
+          draft: false
+          prerelease: false
+          files: |
+            Hytale-World-Exporter-macOS.zip
+            Hytale-World-Exporter-Windows.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

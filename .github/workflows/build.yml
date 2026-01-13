@@ -81,6 +81,9 @@ jobs:
           if [ -n "${{ secrets.MACOS_CERTIFICATE }}" ]; then
             echo "Code signing with certificate..."
             
+            # Set up trap for cleanup
+            trap 'rm -f certificate.p12; security delete-keychain build.keychain 2>/dev/null || true' EXIT
+            
             # Import certificate
             echo "${{ secrets.MACOS_CERTIFICATE }}" | base64 --decode > certificate.p12
             security create-keychain -p "${{ secrets.MACOS_KEYCHAIN_PASSWORD }}" build.keychain
@@ -90,11 +93,7 @@ jobs:
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${{ secrets.MACOS_KEYCHAIN_PASSWORD }}" build.keychain
             
             # Sign the app
-            codesign --deep --force --verify --verbose --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" --options runtime "Hytale World Exporter.app"
-            
-            # Clean up
-            rm certificate.p12
-            security delete-keychain build.keychain
+            codesign --deep --force --verbose --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" --options runtime "Hytale World Exporter.app"
           else
             echo "No signing certificate found. Using ad-hoc signature..."
             # Ad-hoc signature - allows the app to run on the building machine and be distributed for testing

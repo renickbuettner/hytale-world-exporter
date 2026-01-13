@@ -23,21 +23,6 @@ A cross-platform desktop application for backing up and restoring Hytale game wo
 
 Download the latest release from [GitHub Releases](https://github.com/renickbuettner/hytale-world-exporter/releases).
 
-#### macOS Installation Notes
-
-Due to macOS security requirements, you may see a warning when opening the app for the first time. To run the app:
-
-1. **First time opening**: Right-click (or Control-click) on the app and select "Open"
-2. Click "Open" in the dialog that appears
-3. The app will now run and can be opened normally in the future
-
-Alternatively, you can allow the app in System Preferences:
-1. Go to **System Preferences** > **Security & Privacy** > **General**
-2. Click "Open Anyway" next to the message about the blocked app
-3. Confirm by clicking "Open"
-
-**Für deutsche Anleitung zur Code-Signierung, siehe [docs/MACOS_CODESIGNING_DE.md](docs/MACOS_CODESIGNING_DE.md)**
-
 ### Building from Source
 
 ```bash
@@ -56,24 +41,6 @@ Since the app is not signed with an Apple Developer ID yet, macOS Gatekeeper may
    xattr -cr "/path/to/Hytale World Exporter.app"
    ```
 4. Now try opening the app again.
-
-When building locally on macOS, you can sign the app bundle with an ad-hoc signature:
-
-```bash
-# Build the binary
-cargo build --release
-
-# Create app bundle
-mkdir -p "Hytale World Exporter.app/Contents/MacOS"
-mkdir -p "Hytale World Exporter.app/Contents/Resources"
-cp target/release/hytale-world-exporter "Hytale World Exporter.app/Contents/MacOS/"
-
-# Create Info.plist (see build workflow for full example)
-# ...
-
-# Sign with ad-hoc signature
-codesign --force --deep --sign - "Hytale World Exporter.app"
-```
 
 ## World Paths
 

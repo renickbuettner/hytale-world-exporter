@@ -356,165 +356,149 @@ impl eframe::App for HytaleBackupApp {
 
             ui.add_space(20.0);
 
-            // 1/3 - 2/3 split layout
-            let available_width = ui.available_width();
-            let left_width = available_width * 0.32;
-            let right_width = available_width * 0.65;
-
+            // World list section
             ui.horizontal(|ui| {
-                // Left panel (1/3) - World list
-                ui.vertical(|ui| {
-                    ui.set_width(left_width);
+                ui.label(t!("app.available_worlds"));
+                if ui.button(t!("app.refresh")).clicked() {
+                    self.refresh_worlds();
+                }
+            });
 
+            ui.add_space(10.0);
+
+            if self.worlds.is_empty() {
+                ui.label(t!("app.no_worlds_found"));
+            } else {
+                egui::ScrollArea::vertical()
+                    .id_salt("worlds_list")
+                    .max_height(120.0)
+                    .show(ui, |ui| {
+                        for (index, world) in self.worlds.iter().enumerate() {
+                            let is_selected = self.selected_world == Some(index);
+                            if ui.selectable_label(is_selected, format!("🌍 {}", world.name)).clicked() {
+                                self.selected_world = Some(index);
+                            }
+                        }
+                    });
+            }
+
+            ui.add_space(20.0);
+            ui.separator();
+            ui.add_space(10.0);
+
+            // Details section
+            ui.label(t!("app.details"));
+            ui.add_space(10.0);
+
+            if let Some(index) = self.selected_world {
+                if let Some(world) = self.worlds.get(index) {
+                    egui::Frame::group(ui.style())
+                        .fill(ui.style().visuals.extreme_bg_color)
+                        .inner_margin(10.0)
+                        .rounding(5.0)
+                        .show(ui, |ui| {
+                            ui.label(egui::RichText::new(&world.name).strong().size(16.0));
+                            ui.add_space(10.0);
+
+                            egui::Grid::new("world_details")
+                                .num_columns(2)
+                                .spacing([10.0, 5.0])
+                                .show(ui, |ui| {
+                                    ui.label(t!("app.detail_size"));
+                                    ui.label(format_size(world.size));
+                                    ui.end_row();
+
+                                    ui.label(t!("app.detail_files"));
+                                    ui.label(format!("{}", world.file_count));
+                                    ui.end_row();
+
+                                    ui.label(t!("app.detail_path"));
+                                    ui.label(egui::RichText::new(world.path.to_string_lossy().to_string()).small().weak());
+                                    ui.end_row();
+                                });
+                        });
+
+                    ui.add_space(15.0);
+
+                    // Tab navigation
                     ui.horizontal(|ui| {
-                        ui.label(t!("app.available_worlds"));
-                        if ui.button(t!("app.refresh")).clicked() {
-                            self.refresh_worlds();
+                        if ui.selectable_label(self.selected_tab == 0, t!("app.tab_backups")).clicked() {
+                            self.selected_tab = 0;
+                        }
+                        ui.separator();
+                        if ui.selectable_label(self.selected_tab == 1, t!("app.tab_logs")).clicked() {
+                            self.selected_tab = 1;
                         }
                     });
 
                     ui.add_space(10.0);
 
-                    if self.worlds.is_empty() {
-                        ui.label(t!("app.no_worlds_found"));
-                    } else {
-                        egui::ScrollArea::vertical()
-                            .id_salt("worlds_list")
-                            .max_height(350.0)
-                            .show(ui, |ui| {
-                                for (index, world) in self.worlds.iter().enumerate() {
-                                    let is_selected = self.selected_world == Some(index);
-                                    if ui.selectable_label(is_selected, format!("🌍 {}", world.name)).clicked() {
-                                        self.selected_world = Some(index);
-                                    }
-                                }
-                            });
-                    }
-                });
+                    // Tab content
+                    let world_path = world.path.clone();
 
-                ui.add_space(10.0);
+                    match self.selected_tab {
+                        0 => {
+                            // Backups tab
+                            let backups = get_world_backups(&world_path);
 
-                // Right panel (2/3) - World details
-                ui.vertical(|ui| {
-                    ui.set_width(right_width);
-
-                    ui.label(t!("app.details"));
-                    ui.add_space(10.0);
-
-                    if let Some(index) = self.selected_world {
-                        if let Some(world) = self.worlds.get(index) {
-                            egui::Frame::group(ui.style())
-                                .fill(ui.style().visuals.extreme_bg_color)
-                                .inner_margin(10.0)
-                                .rounding(5.0)
-                                .show(ui, |ui| {
-                                    ui.label(egui::RichText::new(&world.name).strong().size(16.0));
-                                    ui.add_space(10.0);
-
-                                    egui::Grid::new("world_details")
-                                        .num_columns(2)
-                                        .spacing([10.0, 5.0])
-                                        .show(ui, |ui| {
-                                            ui.label(t!("app.detail_size"));
-                                            ui.label(format_size(world.size));
-                                            ui.end_row();
-
-                                            ui.label(t!("app.detail_files"));
-                                            ui.label(format!("{}", world.file_count));
-                                            ui.end_row();
-
-                                            ui.label(t!("app.detail_path"));
-                                            ui.end_row();
-                                        });
-
-                                    // Path on separate line (can be long)
-                                    ui.add_space(5.0);
-                                    ui.label(egui::RichText::new(world.path.to_string_lossy().to_string()).small().weak());
-                                });
-
-                            ui.add_space(15.0);
-
-                            // Tab navigation
-                            ui.horizontal(|ui| {
-                                if ui.selectable_label(self.selected_tab == 0, t!("app.tab_backups")).clicked() {
-                                    self.selected_tab = 0;
-                                }
-                                ui.separator();
-                                if ui.selectable_label(self.selected_tab == 1, t!("app.tab_logs")).clicked() {
-                                    self.selected_tab = 1;
-                                }
-                            });
-
-                            ui.add_space(10.0);
-
-                            // Tab content
-                            let world_path = world.path.clone();
-
-                            match self.selected_tab {
-                                0 => {
-                                    // Backups tab
-                                    let backups = get_world_backups(&world_path);
-
-                                    if backups.is_empty() {
-                                        ui.label(t!("app.no_backups_found"));
-                                    } else {
-                                        egui::ScrollArea::vertical()
-                                            .id_salt("backups_list")
-                                            .max_height(200.0)
-                                            .show(ui, |ui| {
-                                                for backup in &backups {
-                                                    egui::Frame::group(ui.style())
-                                                        .inner_margin(5.0)
-                                                        .show(ui, |ui| {
-                                                            ui.horizontal(|ui| {
-                                                                ui.vertical(|ui| {
-                                                                    ui.label(egui::RichText::new(&backup.name).strong());
-                                                                    ui.label(egui::RichText::new(format_size(backup.size)).small().weak());
-                                                                });
-
-                                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                                    if ui.button("📂").on_hover_text(t!("app.open_in_finder")).clicked() {
-                                                                        open_file_in_finder(&backup.path);
-                                                                    }
-                                                                });
-                                                            });
+                            if backups.is_empty() {
+                                ui.label(t!("app.no_backups_found"));
+                            } else {
+                                egui::ScrollArea::vertical()
+                                    .id_salt("backups_list")
+                                    .max_height(150.0)
+                                    .show(ui, |ui| {
+                                        for backup in &backups {
+                                            egui::Frame::group(ui.style())
+                                                .inner_margin(5.0)
+                                                .show(ui, |ui| {
+                                                    ui.horizontal(|ui| {
+                                                        ui.vertical(|ui| {
+                                                            ui.label(egui::RichText::new(&backup.name).strong());
+                                                            ui.label(egui::RichText::new(format_size(backup.size)).small().weak());
                                                         });
-                                                    ui.add_space(5.0);
-                                                }
-                                            });
-                                    }
-                                },
-                                1 => {
-                                    // Logs tab
-                                    if let Some(log) = get_latest_log(&world_path) {
-                                        ui.horizontal(|ui| {
-                                            ui.label(egui::RichText::new(&log.name).strong());
-                                            if ui.button("📂").on_hover_text(t!("app.open_in_finder")).clicked() {
-                                                open_file_in_finder(&log.path);
-                                            }
-                                        });
-                                        ui.add_space(5.0);
 
-                                        egui::ScrollArea::vertical()
-                                            .id_salt("logs_content")
-                                            .max_height(200.0)
-                                            .show(ui, |ui| {
-                                                ui.add(egui::TextEdit::multiline(&mut log.content.as_str())
-                                                    .font(egui::TextStyle::Monospace)
-                                                    .desired_width(f32::INFINITY));
-                                            });
-                                    } else {
-                                        ui.label(t!("app.no_logs_found"));
-                                    }
-                                },
-                                _ => {}
+                                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                            if ui.button("📂").on_hover_text(t!("app.open_in_finder")).clicked() {
+                                                                open_file_in_finder(&backup.path);
+                                                            }
+                                                        });
+                                                    });
+                                                });
+                                            ui.add_space(5.0);
+                                        }
+                                    });
                             }
-                        }
-                    } else {
-                        ui.label(t!("app.select_world_hint"));
+                        },
+                        1 => {
+                            // Logs tab
+                            if let Some(log) = get_latest_log(&world_path) {
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new(&log.name).strong());
+                                    if ui.button("📂").on_hover_text(t!("app.open_in_finder")).clicked() {
+                                        open_file_in_finder(&log.path);
+                                    }
+                                });
+                                ui.add_space(5.0);
+
+                                egui::ScrollArea::vertical()
+                                    .id_salt("logs_content")
+                                    .max_height(150.0)
+                                    .show(ui, |ui| {
+                                        ui.add(egui::TextEdit::multiline(&mut log.content.as_str())
+                                            .font(egui::TextStyle::Monospace)
+                                            .desired_width(f32::INFINITY));
+                                    });
+                            } else {
+                                ui.label(t!("app.no_logs_found"));
+                            }
+                        },
+                        _ => {}
                     }
-                });
-            });
+                }
+            } else {
+                ui.label(t!("app.select_world_hint"));
+            }
         });
     }
 }

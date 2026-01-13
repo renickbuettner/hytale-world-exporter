@@ -274,13 +274,13 @@ impl eframe::App for HytaleBackupApp {
 
             ui.add_space(20.0);
 
-            // 2/3 - 1/3 split layout
+            // 1/3 - 2/3 split layout
             let available_width = ui.available_width();
-            let left_width = available_width * 0.65;
-            let right_width = available_width * 0.32;
+            let left_width = available_width * 0.32;
+            let right_width = available_width * 0.65;
 
             ui.horizontal(|ui| {
-                // Left panel (2/3) - World list
+                // Left panel (1/3) - World list
                 ui.vertical(|ui| {
                     ui.set_width(left_width);
 
@@ -311,7 +311,7 @@ impl eframe::App for HytaleBackupApp {
 
                 ui.add_space(10.0);
 
-                // Right panel (1/3) - World details
+                // Right panel (2/3) - World details
                 ui.vertical(|ui| {
                     ui.set_width(right_width);
 

@@ -63,6 +63,86 @@ struct WorldInfo {
     file_count: usize,
 }
 
+#[derive(Clone)]
+struct BackupInfo {
+    name: String,
+    path: PathBuf,
+    size: u64,
+}
+
+#[derive(Clone)]
+struct LogInfo {
+    name: String,
+    path: PathBuf,
+    content: String,
+}
+
+fn get_world_backups(world_path: &PathBuf) -> Vec<BackupInfo> {
+    let backup_path = world_path.join("backup");
+    if !backup_path.exists() {
+        return Vec::new();
+    }
+
+    fs::read_dir(&backup_path)
+        .map(|entries| {
+            entries
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| entry.path().is_file())
+                .filter_map(|entry| {
+                    let name = entry.file_name().to_str()?.to_string();
+                    let path = entry.path();
+                    let size = entry.metadata().ok()?.len();
+                    Some(BackupInfo { name, path, size })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn get_latest_log(world_path: &PathBuf) -> Option<LogInfo> {
+    let logs_path = world_path.join("logs");
+    if !logs_path.exists() {
+        return None;
+    }
+
+    let mut logs: Vec<_> = fs::read_dir(&logs_path)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            entry.path().is_file() &&
+            entry.path().extension().map_or(false, |ext| ext == "log")
+        })
+        .collect();
+
+    // Sort by filename descending (newest first based on timestamp in filename)
+    logs.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
+
+    logs.first().and_then(|entry| {
+        let name = entry.file_name().to_str()?.to_string();
+        let path = entry.path();
+        let content = fs::read_to_string(&path).unwrap_or_else(|_| String::from("Could not read log file"));
+        Some(LogInfo { name, path, content })
+    })
+}
+
+fn open_file_in_finder(path: &PathBuf) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open")
+            .arg("-R")
+            .arg(path)
+            .spawn();
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("explorer")
+            .arg("/select,")
+            .arg(path)
+            .spawn();
+    }
+}
+
 fn main() -> Result<(), eframe::Error> {
     // Set locale based on system language
     let locale = detect_system_locale();
@@ -107,6 +187,7 @@ struct HytaleBackupApp {
     status_message: String,
     worlds: Vec<WorldInfo>,
     selected_world: Option<usize>,
+    selected_tab: usize,
     progress: Arc<Mutex<BackupProgress>>,
 }
 
@@ -117,6 +198,7 @@ impl HytaleBackupApp {
             status_message: String::new(),
             worlds,
             selected_world: None,
+            selected_tab: 0,
             progress: Arc::new(Mutex::new(BackupProgress::default())),
         }
     }
@@ -348,6 +430,82 @@ impl eframe::App for HytaleBackupApp {
                                     ui.add_space(5.0);
                                     ui.label(egui::RichText::new(world.path.to_string_lossy().to_string()).small().weak());
                                 });
+
+                            ui.add_space(15.0);
+
+                            // Tab navigation
+                            ui.horizontal(|ui| {
+                                if ui.selectable_label(self.selected_tab == 0, t!("app.tab_backups")).clicked() {
+                                    self.selected_tab = 0;
+                                }
+                                ui.separator();
+                                if ui.selectable_label(self.selected_tab == 1, t!("app.tab_logs")).clicked() {
+                                    self.selected_tab = 1;
+                                }
+                            });
+
+                            ui.add_space(10.0);
+
+                            // Tab content
+                            let world_path = world.path.clone();
+
+                            match self.selected_tab {
+                                0 => {
+                                    // Backups tab
+                                    let backups = get_world_backups(&world_path);
+
+                                    if backups.is_empty() {
+                                        ui.label(t!("app.no_backups_found"));
+                                    } else {
+                                        egui::ScrollArea::vertical()
+                                            .max_height(200.0)
+                                            .show(ui, |ui| {
+                                                for backup in &backups {
+                                                    egui::Frame::group(ui.style())
+                                                        .inner_margin(5.0)
+                                                        .show(ui, |ui| {
+                                                            ui.horizontal(|ui| {
+                                                                ui.vertical(|ui| {
+                                                                    ui.label(egui::RichText::new(&backup.name).strong());
+                                                                    ui.label(egui::RichText::new(format_size(backup.size)).small().weak());
+                                                                });
+
+                                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                    if ui.button("📂").on_hover_text(t!("app.open_in_finder")).clicked() {
+                                                                        open_file_in_finder(&backup.path);
+                                                                    }
+                                                                });
+                                                            });
+                                                        });
+                                                    ui.add_space(5.0);
+                                                }
+                                            });
+                                    }
+                                },
+                                1 => {
+                                    // Logs tab
+                                    if let Some(log) = get_latest_log(&world_path) {
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new(&log.name).strong());
+                                            if ui.button("📂").on_hover_text(t!("app.open_in_finder")).clicked() {
+                                                open_file_in_finder(&log.path);
+                                            }
+                                        });
+                                        ui.add_space(5.0);
+
+                                        egui::ScrollArea::vertical()
+                                            .max_height(200.0)
+                                            .show(ui, |ui| {
+                                                ui.add(egui::TextEdit::multiline(&mut log.content.as_str())
+                                                    .font(egui::TextStyle::Monospace)
+                                                    .desired_width(f32::INFINITY));
+                                            });
+                                    } else {
+                                        ui.label(t!("app.no_logs_found"));
+                                    }
+                                },
+                                _ => {}
+                            }
                         }
                     } else {
                         ui.label(t!("app.select_world_hint"));

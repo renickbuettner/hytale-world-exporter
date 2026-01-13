@@ -12,6 +12,11 @@ app:
   detail_files: "Files:"
   detail_path: "Path:"
   select_world_hint: "Select a world to view details."
+  tab_backups: "📦 Backups"
+  tab_logs: "📋 Logs"
+  no_backups_found: "No backups found."
+  no_logs_found: "No logs found."
+  open_in_finder: "Show in Finder"
 
 errors:
   appdata_not_found: "APPDATA environment variable not found"

@@ -1,8 +1,6 @@
 # Rust
 /target
-Cargo.lock
 **/*.rs.bk
-*.pdb
 
 # IntelliJ IDEA
 .idea/
@@ -16,7 +14,7 @@ out/
 .DS_Store
 .AppleDouble
 .LSOverride
-Icon
+Icon?
 ._*
 .DocumentRevisions-V100
 .fseventsd
@@ -45,3 +43,4 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk
+*.pdb

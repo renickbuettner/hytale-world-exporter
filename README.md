@@ -29,7 +29,7 @@ cargo build --release
 
 ## World Paths
 
-- **Windows**: `%APPDATA%/Hytale/worlds`
+- **Windows**: `%APPDATA%/Hytale/UserData/Saves`
 - **macOS**: `~/Library/Application Support/Hytale/UserData/Saves`
 
 ## License

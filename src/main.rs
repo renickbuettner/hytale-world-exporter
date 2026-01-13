@@ -672,7 +672,10 @@ fn get_hytale_worlds_path() -> Result<PathBuf, String> {
     #[cfg(target_os = "windows")]
     {
         if let Some(appdata) = std::env::var_os("APPDATA") {
-            return Ok(PathBuf::from(appdata).join("Hytale").join("worlds"));
+            return Ok(PathBuf::from(appdata)
+                .join("Hytale")
+                .join("UserData")
+                .join("Saves"));;
         }
         Err(t!("errors.appdata_not_found").to_string())
     }

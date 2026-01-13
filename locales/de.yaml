@@ -4,6 +4,7 @@ app:
   refresh: "🔄 Aktualisieren"
   no_worlds_found: "Keine Welten gefunden."
   compress_world: "🗜️ Welt komprimieren"
+  compressing: "Komprimiere..."
   backup_success: "✓ Backup erfolgreich erstellt:"
   error: "✗ Fehler:"
 

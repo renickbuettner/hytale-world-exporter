@@ -2,6 +2,8 @@ use eframe::egui;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::thread;
 use walkdir::WalkDir;
 use zip::write::FileOptions;
 use zip::ZipWriter;
@@ -38,10 +40,32 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 
+#[derive(Clone)]
+struct BackupProgress {
+    current: usize,
+    total: usize,
+    current_file: String,
+    is_running: bool,
+    result: Option<Result<String, String>>,
+}
+
+impl Default for BackupProgress {
+    fn default() -> Self {
+        Self {
+            current: 0,
+            total: 0,
+            current_file: String::new(),
+            is_running: false,
+            result: None,
+        }
+    }
+}
+
 struct HytaleBackupApp {
     status_message: String,
     worlds: Vec<String>,
     selected_world: Option<usize>,
+    progress: Arc<Mutex<BackupProgress>>,
 }
 
 impl HytaleBackupApp {
@@ -51,6 +75,7 @@ impl HytaleBackupApp {
             status_message: String::new(),
             worlds,
             selected_world: None,
+            progress: Arc::new(Mutex::new(BackupProgress::default())),
         }
     }
 
@@ -120,38 +145,95 @@ impl eframe::App for HytaleBackupApp {
 
             ui.add_space(20.0);
             
-            ui.vertical_centered(|ui| {
-                let button_enabled = self.selected_world.is_some();
-                if ui.add_enabled(button_enabled, egui::Button::new(t!("app.compress_world"))).clicked() {
-                    if let Some(index) = self.selected_world {
-                        let world_name = self.worlds[index].clone();
+            // Check progress status
+            let progress_state = self.progress.lock().unwrap().clone();
 
-                        // Create default filename with timestamp
-                        let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
-                        let default_filename = format!("{}_{}.zip", world_name, timestamp);
+            if progress_state.is_running {
+                // Show progress bar while backup is running
+                ui.vertical_centered(|ui| {
+                    ui.label(t!("app.compressing"));
 
-                        // Show save file dialog
-                        let file_dialog = rfd::FileDialog::new()
-                            .set_file_name(&default_filename)
-                            .add_filter("ZIP", &["zip"]);
+                    let progress_fraction = if progress_state.total > 0 {
+                        progress_state.current as f32 / progress_state.total as f32
+                    } else {
+                        0.0
+                    };
 
-                        // Set default directory to Downloads if available
-                        let file_dialog = if let Some(downloads) = dirs::download_dir() {
-                            file_dialog.set_directory(&downloads)
-                        } else {
-                            file_dialog
-                        };
+                    ui.add(egui::ProgressBar::new(progress_fraction)
+                        .show_percentage()
+                        .animate(true));
 
-                        if let Some(save_path) = file_dialog.save_file() {
-                            self.status_message = match backup_world_to_path(&world_name, &save_path) {
-                                Ok(path) => format!("{}\n{}", t!("app.backup_success"), path),
-                                Err(e) => format!("{} {}", t!("app.error"), e),
+                    ui.label(format!("{} / {}", progress_state.current, progress_state.total));
+
+                    if !progress_state.current_file.is_empty() {
+                        ui.label(&progress_state.current_file);
+                    }
+                });
+
+                // Request repaint to update progress
+                ctx.request_repaint();
+            } else {
+                // Check if there's a result from a completed backup
+                if let Some(result) = progress_state.result.clone() {
+                    self.status_message = match result {
+                        Ok(path) => format!("{}\n{}", t!("app.backup_success"), path),
+                        Err(e) => format!("{} {}", t!("app.error"), e),
+                    };
+                    // Clear the result
+                    self.progress.lock().unwrap().result = None;
+                }
+
+                ui.vertical_centered(|ui| {
+                    let button_enabled = self.selected_world.is_some();
+                    if ui.add_enabled(button_enabled, egui::Button::new(t!("app.compress_world"))).clicked() {
+                        if let Some(index) = self.selected_world {
+                            let world_name = self.worlds[index].clone();
+
+                            // Create default filename with timestamp
+                            let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
+                            let default_filename = format!("{}_{}.zip", world_name, timestamp);
+
+                            // Show save file dialog
+                            let file_dialog = rfd::FileDialog::new()
+                                .set_file_name(&default_filename)
+                                .add_filter("ZIP", &["zip"]);
+
+                            // Set default directory to Downloads if available
+                            let file_dialog = if let Some(downloads) = dirs::download_dir() {
+                                file_dialog.set_directory(&downloads)
+                            } else {
+                                file_dialog
                             };
+
+                            if let Some(save_path) = file_dialog.save_file() {
+                                // Start backup in background thread
+                                let progress = Arc::clone(&self.progress);
+                                let ctx = ctx.clone();
+
+                                // Reset progress
+                                {
+                                    let mut p = progress.lock().unwrap();
+                                    p.is_running = true;
+                                    p.current = 0;
+                                    p.total = 0;
+                                    p.current_file = String::new();
+                                    p.result = None;
+                                }
+
+                                thread::spawn(move || {
+                                    let result = backup_world_to_path_with_progress(&world_name, &save_path, &progress, &ctx);
+
+                                    let mut p = progress.lock().unwrap();
+                                    p.is_running = false;
+                                    p.result = Some(result);
+                                    ctx.request_repaint();
+                                });
+                            }
                         }
                     }
-                }
-            });
-            
+                });
+            }
+
             ui.add_space(20.0);
             
             if !self.status_message.is_empty() {
@@ -193,13 +275,30 @@ fn get_hytale_worlds_path() -> Result<PathBuf, String> {
 
 
 
-fn backup_world_to_path(world_name: &str, zip_path: &PathBuf) -> Result<String, String> {
+fn backup_world_to_path_with_progress(
+    world_name: &str,
+    zip_path: &PathBuf,
+    progress: &Arc<Mutex<BackupProgress>>,
+    ctx: &egui::Context,
+) -> Result<String, String> {
     // Get the worlds directory
     let worlds_path = get_hytale_worlds_path()?;
     let world_path = worlds_path.join(world_name);
 
     if !world_path.exists() {
         return Err(t!("errors.world_not_found", name = world_name).to_string());
+    }
+
+    // Count total files first
+    let total_files: usize = WalkDir::new(&world_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .count();
+
+    {
+        let mut p = progress.lock().unwrap();
+        p.total = total_files;
     }
 
     // Create the ZIP file
@@ -209,6 +308,8 @@ fn backup_world_to_path(world_name: &str, zip_path: &PathBuf) -> Result<String, 
     let mut zip = ZipWriter::new(file);
     let options = FileOptions::<()>::default()
         .compression_method(zip::CompressionMethod::Deflated);
+
+    let mut current_count = 0;
 
     // Walk through all files in the world directory
     for entry in WalkDir::new(&world_path) {
@@ -224,6 +325,16 @@ fn backup_world_to_path(world_name: &str, zip_path: &PathBuf) -> Result<String, 
         }
 
         if path.is_file() {
+            current_count += 1;
+
+            // Update progress
+            {
+                let mut p = progress.lock().unwrap();
+                p.current = current_count;
+                p.current_file = name.to_string_lossy().to_string();
+            }
+            ctx.request_repaint();
+
             // Add file to ZIP
             zip.start_file(name.to_string_lossy().to_string(), options)
                 .map_err(|e| t!("errors.add_file_failed", error = e.to_string()).to_string())?;

@@ -227,6 +227,7 @@ struct HytaleBackupApp {
     include_logs: bool,
     include_backups: bool,
     progress: Arc<Mutex<BackupProgress>>,
+    pending_delete_backup: Option<PathBuf>,
 }
 
 impl HytaleBackupApp {
@@ -240,6 +241,7 @@ impl HytaleBackupApp {
             include_logs: true,
             include_backups: true,
             progress: Arc::new(Mutex::new(BackupProgress::default())),
+            pending_delete_backup: None,
         }
     }
 
@@ -283,6 +285,35 @@ impl HytaleBackupApp {
 
 impl eframe::App for HytaleBackupApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Delete confirmation dialog
+        if let Some(backup_path) = self.pending_delete_backup.clone() {
+            egui::Window::new(t!("app.confirm_delete_title"))
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(ctx, |ui| {
+                    ui.label(t!("app.confirm_delete_message"));
+                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new(backup_path.file_name().unwrap_or_default().to_string_lossy().to_string()).strong());
+                    ui.add_space(15.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button(t!("app.cancel")).clicked() {
+                            self.pending_delete_backup = None;
+                        }
+
+                        if ui.button(egui::RichText::new(t!("app.delete")).color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
+                            if let Err(e) = fs::remove_file(&backup_path) {
+                                self.status_message = format!("{} {}", t!("app.error"), e);
+                            } else {
+                                self.status_message = t!("app.backup_deleted").to_string();
+                            }
+                            self.pending_delete_backup = None;
+                        }
+                    });
+                });
+        }
+
         // Bottom toolbar
         egui::TopBottomPanel::bottom("toolbar").show(ctx, |ui| {
             ui.add_space(10.0);
@@ -517,6 +548,9 @@ impl eframe::App for HytaleBackupApp {
                                                         });
 
                                                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                            if ui.button("🗑").on_hover_text(t!("app.delete_backup")).clicked() {
+                                                                self.pending_delete_backup = Some(backup.path.clone());
+                                                            }
                                                             if ui.button("📂").on_hover_text(t!("app.open_in_finder")).clicked() {
                                                                 open_file_in_finder(&backup.path);
                                                             }

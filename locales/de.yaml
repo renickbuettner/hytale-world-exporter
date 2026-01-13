@@ -18,6 +18,12 @@ app:
   no_backups_found: "Keine Backups gefunden."
   no_logs_found: "Keine Logs gefunden."
   open_in_finder: "Im Finder anzeigen"
+  delete_backup: "Backup löschen"
+  confirm_delete_title: "Backup löschen?"
+  confirm_delete_message: "Möchtest du dieses Backup wirklich löschen?"
+  cancel: "Abbrechen"
+  delete: "Löschen"
+  backup_deleted: "Backup wurde gelöscht."
   include_logs: "Logs einschließen"
   include_backups: "Backups einschließen"
 

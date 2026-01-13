@@ -12,6 +12,8 @@ use rust_i18n::t;
 
 rust_i18n::i18n!("locales", fallback = "en");
 
+const TAB_CONTENT_MAX_HEIGHT: f32 = 220.0;
+
 fn detect_system_locale() -> String {
     sys_locale::get_locale()
         .map(|locale| {
@@ -455,7 +457,7 @@ impl eframe::App for HytaleBackupApp {
                             } else {
                                 egui::ScrollArea::vertical()
                                     .id_salt("backups_list")
-                                    .max_height(150.0)
+                                    .max_height(TAB_CONTENT_MAX_HEIGHT)
                                     .show(ui, |ui| {
                                         for backup in &backups {
                                             egui::Frame::group(ui.style())
@@ -492,7 +494,7 @@ impl eframe::App for HytaleBackupApp {
 
                                 egui::ScrollArea::vertical()
                                     .id_salt("logs_content")
-                                    .max_height(150.0)
+                                    .max_height(TAB_CONTENT_MAX_HEIGHT)
                                     .show(ui, |ui| {
                                         ui.add(egui::TextEdit::multiline(&mut log.content.as_str())
                                             .font(egui::TextStyle::Monospace)

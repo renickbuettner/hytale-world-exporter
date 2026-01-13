@@ -31,7 +31,7 @@ cd hytale-world-exporter
 cargo build --release
 ```
 
-#### macOS: Open app by bypassing Gatekeeper
+### macOS: Open app by bypassing Gatekeeper
 
 Since the app is not signed with an Apple Developer ID yet, macOS Gatekeeper may block it. To open the app:
 

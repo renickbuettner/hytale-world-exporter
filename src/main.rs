@@ -404,7 +404,6 @@ impl eframe::App for HytaleBackupApp {
             if let Some(index) = self.selected_world {
                 if let Some(world) = self.worlds.get(index) {
                     egui::Frame::group(ui.style())
-                        .fill(ui.style().visuals.extreme_bg_color)
                         .inner_margin(10.0)
                         .rounding(5.0)
                         .show(ui, |ui| {
@@ -466,7 +465,7 @@ impl eframe::App for HytaleBackupApp {
                                                     ui.horizontal(|ui| {
                                                         ui.vertical(|ui| {
                                                             ui.label(egui::RichText::new(&backup.name).strong());
-                                                            ui.label(egui::RichText::new(format_size(backup.size)).small().weak());
+                                                            ui.label(egui::RichText::new(format_size(backup.size)).weak());
                                                         });
 
                                                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

@@ -359,7 +359,7 @@ impl HytaleBackupApp {
                 let available_width = ui.available_width();
                 egui::Frame::group(ui.style())
                     .inner_margin(10.0)
-                    .rounding(5.0)
+                    .corner_radius(5.0)
                     .show(ui, |ui| {
                         ui.set_width(available_width - 20.0);
                         ui.label(egui::RichText::new(&world.name).strong().size(16.0));

@@ -21,7 +21,17 @@ A cross-platform desktop application for backing up and restoring Hytale game wo
 
 ### Download
 
-Download the latest release from [GitHub Releases](https://github.com/renickbuettner/hytale-world-exporter/releases).
+<p align="center">
+  <a href="https://github.com/renickbuettner/hytale-world-exporter/releases/download/build-de6edad/Hytale-World-Exporter-Windows.zip">
+    <img src="assets/download_win.png" alt="Download for Windows" height="120">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/renickbuettner/hytale-world-exporter/releases/download/build-e278890/Hytale-World-Exporter-signed.zip">
+    <img src="assets/download_mac.png" alt="Download for macOS" height="120">
+  </a>
+</p>
+
+Download alternate versions from the [GitHub Releases](https://github.com/renickbuettner/hytale-world-exporter/releases).
 
 ### Building from Source
 

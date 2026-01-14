@@ -31,6 +31,7 @@ A cross-platform desktop application for backing up and restoring Hytale game wo
   </a>
 </p>
 
+I can provide a signed macOS app build, find the most recent link through the download button. 
 Download alternate versions from the [GitHub Releases](https://github.com/renickbuettner/hytale-world-exporter/releases).
 
 ### Building from Source
@@ -43,7 +44,7 @@ cargo build --release
 
 ### macOS: Open app by bypassing Gatekeeper
 
-Since the app is not signed with an Apple Developer ID yet, macOS Gatekeeper may block it. To open the app:
+Since a usual app build is not signed with an Apple Developer ID yet, macOS Gatekeeper may block it. To open the app:
 
 1. Open Terminal
 2. Run the following command, replacing the path with your app's path. You can drag-and-drop the app into the Terminal to get the correct path.

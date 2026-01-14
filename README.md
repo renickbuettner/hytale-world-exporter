@@ -15,7 +15,6 @@ A cross-platform desktop application for backing up and restoring Hytale game wo
 - 📋 View server logs with syntax highlighting (WARN/ERROR)
 - 📦 Manage existing world backups
 - 🌐 Localized (English & German, auto-detected)
-- 📊 Progress indicator during compression
 
 ## Installation
 

@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use crate::backup::{backup_world_to_path_with_progress, get_hytale_worlds_path, import_world};
+use crate::log_filter::{detect_log_level, should_filter_line, LogLevel};
 use crate::models::{BackupProgress, WorldInfo};
 use crate::utils::{
     format_size, get_directory_size, get_last_played, get_latest_log, get_world_backups,
@@ -25,6 +26,7 @@ pub struct HytaleBackupApp {
     pub progress: Arc<Mutex<BackupProgress>>,
     pub pending_delete_backup: Option<PathBuf>,
     pub pending_import: Option<(PathBuf, String)>,
+    pub hide_info_logs: bool,
 }
 
 impl HytaleBackupApp {
@@ -40,6 +42,7 @@ impl HytaleBackupApp {
             progress: Arc::new(Mutex::new(BackupProgress::default())),
             pending_delete_backup: None,
             pending_import: None,
+            hide_info_logs: false,
         }
     }
 
@@ -471,7 +474,7 @@ impl HytaleBackupApp {
         }
     }
 
-    fn render_logs_tab(&self, ui: &mut egui::Ui, world_path: &PathBuf) {
+    fn render_logs_tab(&mut self, ui: &mut egui::Ui, world_path: &PathBuf) {
         if let Some(log) = get_latest_log(world_path) {
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new(&log.name).strong());
@@ -482,6 +485,13 @@ impl HytaleBackupApp {
                 {
                     open_file_in_finder(&log.path);
                 }
+                ui.separator();
+                if ui
+                    .selectable_label(self.hide_info_logs, t!("app.filter_errors_only"))
+                    .clicked()
+                {
+                    self.hide_info_logs = !self.hide_info_logs;
+                }
             });
             ui.add_space(5.0);
 
@@ -490,16 +500,19 @@ impl HytaleBackupApp {
                 .max_height(TAB_CONTENT_MAX_HEIGHT)
                 .show(ui, |ui| {
                     for line in log.content.lines() {
-                        let text = if line.contains("ERROR") {
-                            egui::RichText::new(line)
+                        // Filter lines using LogFilter module
+                        if should_filter_line(line, self.hide_info_logs) {
+                            continue;
+                        }
+
+                        let text = match detect_log_level(line) {
+                            LogLevel::Error => egui::RichText::new(line)
                                 .monospace()
-                                .color(egui::Color32::from_rgb(255, 100, 100))
-                        } else if line.contains("WARN") {
-                            egui::RichText::new(line)
+                                .color(egui::Color32::from_rgb(255, 100, 100)),
+                            LogLevel::Warning => egui::RichText::new(line)
                                 .monospace()
-                                .color(egui::Color32::from_rgb(255, 180, 100))
-                        } else {
-                            egui::RichText::new(line).monospace()
+                                .color(egui::Color32::from_rgb(255, 180, 100)),
+                            LogLevel::Info => egui::RichText::new(line).monospace(),
                         };
                         ui.label(text);
                     }

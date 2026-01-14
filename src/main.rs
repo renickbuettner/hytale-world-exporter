@@ -1,5 +1,6 @@
 mod app;
 mod backup;
+mod log_filter;
 mod models;
 mod utils;
 

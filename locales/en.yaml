@@ -17,6 +17,7 @@ app:
   tab_logs: "📋 Logs"
   no_backups_found: "No backups found."
   no_logs_found: "No logs found."
+  filter_errors_only: "🔍 Errors/Warnings only"
   open_in_finder: "Show in Finder"
   delete_backup: "Delete backup"
   confirm_delete_title: "Delete backup?"

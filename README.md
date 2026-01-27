@@ -8,7 +8,7 @@ A cross-platform desktop application for backing up and restoring Hytale game wo
 
 ## Features
 
-- 🖥️ Cross-platform (macOS & Windows)
+- 🖥️ Cross-platform (Linux, macOS and Windows)
 - 🌍 View and select worlds with details (size, last played)
 - 🗜️ Export worlds as ZIP with optional logs/backups exclusion
 - 📥 Import/restore worlds from ZIP backups
@@ -29,6 +29,8 @@ A cross-platform desktop application for backing up and restoring Hytale game wo
     <img src="assets/download_mac.png" alt="Download for macOS" height="120">
   </a>
 </p>
+
+For Linux, see the Building from Source instructions.
 
 I can provide a signed macOS app build, find the most recent link through the download button. 
 Download alternate versions from the [GitHub Releases](https://github.com/renickbuettner/hytale-world-exporter/releases).
@@ -56,6 +58,7 @@ Since a usual app build is not signed with an Apple Developer ID yet, macOS Gate
 
 - **Windows**: `%APPDATA%/Hytale/UserData/Saves`
 - **macOS**: `~/Library/Application Support/Hytale/UserData/Saves`
+- **Linux**: `~/.var/app/com.hypixel.HytaleLauncher/data/Hytale/UserData/Saves/`
 
 ## License
 
@@ -69,5 +72,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 <p align="center">
   <img src="assets/screenshots/macos_02_logs.png" alt="Logs Tab" width="600">
+</p>
+
+<p align="center">
+<img width="818" height="660" alt="image" src="https://github.com/user-attachments/assets/bf82030c-7472-49ad-a443-c2802e041b70" />
 </p>
 

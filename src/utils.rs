@@ -151,5 +151,14 @@ pub fn open_file_in_finder(path: &PathBuf) {
             .arg(path)
             .spawn();
     }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(parent) = path.parent() {
+            let _ = std::process::Command::new("xdg-open")
+                .arg(parent)
+                .spawn();
+        }
+    }
 }
 

@@ -36,7 +36,16 @@ pub fn get_hytale_worlds_path() -> Result<PathBuf, String> {
         Err(t!("errors.home_not_found").to_string())
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(home) = dirs::home_dir() {
+            return Ok(home
+                .join(".var/app/com.hypixel.HytaleLauncher/data/Hytale/UserData/Saves"));
+        }
+        Err(t!("errors.home_not_found").to_string())
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
         Err(t!("errors.platform_not_supported").to_string())
     }

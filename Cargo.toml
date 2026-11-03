@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 eframe = "0.31"
 egui = "0.31"
-zip = "2.4"
+zip = "9.0"
 dirs = "5.0"
 walkdir = "2.5"
 chrono = "0.4"
